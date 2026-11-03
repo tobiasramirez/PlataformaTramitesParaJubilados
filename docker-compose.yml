@@ -1,70 +1,148 @@
-# Clase 10 — Arquitectura de Software 1
-# Un solo comando levanta todo:   docker compose up -d --build
+version: '3.8'
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    internal: true # Red aislada para la BD y el Mock
+
+volumes:
+  postgres_data:
+  keycloak_data:
 
 services:
-
-  # Base de datos. No publica puertos: solo la ven los servicios de la red "backend".
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: cursos
-      POSTGRES_USER: cursos
-      POSTGRES_PASSWORD: cursos123        # en un proyecto real, esto va en un archivo .env que NO se sube al repo
-    volumes:
-      - pgdata:/var/lib/postgresql/data   # volumen con nombre: los datos sobreviven a los contenedores
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro   # bind mount: script que corre la primera vez
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cursos -d cursos"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks:
-      - backend
-
-  # API REST de cursos. Se construye desde ./api (Dockerfile propio).
-  api:
-    build: ./api
-    environment:
-      PORT: 3000
-      DB_HOST: db          # service discovery: el nombre del servicio ES el hostname
-      DB_PORT: 5432
-      DB_NAME: cursos
-      DB_USER: cursos
-      DB_PASSWORD: cursos123
+  # Reverse Proxy / Gateway
+  api-gateway:
+    image: nginx:1.25-alpine
+    container_name: tramites_gateway
     ports:
-      - "3000:3000"        # puerto_host:puerto_contenedor
-    depends_on:
-      db:
-        condition: service_healthy   # espera a que Postgres responda, no solo a que arranque
+      - "80:80"
+      - "443:443"
     networks:
-      - backend
+      - frontend-net
+    depends_on:
+      - backend-web
+      - backend-whatsapp
+      - backend-telefonico
 
-  # Backend For Frontend para la app mobile: le habla a la API por nombre (http://api:3000).
-  bff-mobile:
-    build: ./bff-mobile
+  # 1. Backend Canal Web (Atiende la SPA/SSR accesibles)
+  backend-web:
+    build:
+      context: ./backend-web
+      dockerfile: Dockerfile
+    container_name: tramites_backend_web
+    restart: unless-stopped
+    user: "node"
     environment:
       PORT: 3001
-      API_URL: http://api:3000
-    ports:
-      - "3001:3001"
-    depends_on:
-      - api
+      DB_HOST: db
+      DB_NAME: ${POSTGRES_DB:-tramites_db}
+      DB_USER: ${API_DB_USER:-api_tramites}
+      DB_PASSWORD: ${API_DB_PASS:-api_tramites_pass_sec99}
     networks:
-      - backend
+      - frontend-net
+      - backend-net
+    depends_on:
+      db:
+        condition: service_healthy
 
-  # Documentación autogenerada a partir del contrato OpenAPI.
-  # No está en "backend": no necesita hablar con nadie. Quien llama a la API es tu navegador.
+  # 2. Backend Canal WhatsApp (Webhook M2M para la API de WhatsApp)
+  backend-whatsapp:
+    build:
+      context: ./backend-whatsapp
+      dockerfile: Dockerfile
+    container_name: tramites_backend_whatsapp
+    restart: unless-stopped
+    user: "node"
+    environment:
+      PORT: 3002
+      DB_HOST: db
+      DB_NAME: ${POSTGRES_DB:-tramites_db}
+      DB_USER: ${API_DB_USER:-api_tramites}
+      DB_PASSWORD: ${API_DB_PASS:-api_tramites_pass_sec99}
+    networks:
+      - frontend-net
+      - backend-net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 3. Backend Canal Telefónico (Panel y gestión para Agentes)
+  backend-telefonico:
+    build:
+      context: ./backend-telefonico
+      dockerfile: Dockerfile
+    container_name: tramites_backend_telefonico
+    restart: unless-stopped
+    user: "node"
+    environment:
+      PORT: 3003
+      DB_HOST: db
+      DB_NAME: ${POSTGRES_DB:-tramites_db}
+      DB_USER: ${API_DB_USER:-api_tramites}
+      DB_PASSWORD: ${API_DB_PASS:-api_tramites_pass_sec99}
+    networks:
+      - frontend-net
+      - backend-net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Base de datos compartida aislada en red interna
+  db:
+    image: postgres:16-alpine
+    container_name: tramites_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tramites_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root_pass_123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # IdP (Keycloak)
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: tramites_idp
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/tramites_db
+    networks:
+      - frontend-net
+      - backend-net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Mock Padrón Nacional
+  padron-mock:
+    build:
+      context: ./mocks/padron
+      dockerfile: Dockerfile
+    container_name: tramites_padron_mock
+    networks:
+      - backend-net
+
   swagger-ui:
-    image: swaggerapi/swagger-ui:v5.17.14
+    image: swaggerapi/swagger-ui:v5.11.0
+    container_name: tramites_swagger_ui
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # Expone Swagger UI en el puerto 8080 del host
     environment:
       SWAGGER_JSON: /spec/openapi.yaml
     volumes:
-      - ./openapi.yaml:/spec/openapi.yaml:ro   # bind mount: editás el contrato y recargás, sin rebuild
-    ports:
-      - "8080:8080"
-
-volumes:
-  pgdata:
-
-networks:
-  backend:
+      - ./openapi.yaml:/spec/openapi.yaml:ro # Monta tu contrato local dentro del contenedor
+    networks:
+      - frontend-net
