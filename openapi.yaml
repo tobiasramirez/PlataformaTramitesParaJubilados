@@ -1,153 +1,304 @@
 openapi: 3.0.3
 info:
-  title: API de Cursos — mi Versión
+  title: API Plataforma Regional de Trámites para Jubilados
   version: 1.0.0
   description: |
-    API de ejemplo de la Clase 10 (Arquitectura de Software 1 — UNAHUR).
-    Este archivo es el **contrato**: Swagger UI genera esta documentación a partir de él.
+    API REST para la gestión multicanal e intermunicipal de solicitudes de beneficios
+    para jubilados (Dominio 7B). Implementa respuestas de error según RFC 9457 (Problem Details).
 servers:
-  - url: http://localhost:300
-    description: API levantada con docker compose (vista desde tu navegador)
-tags:
-  - name: Cursos
+  - url: http://localhost:3001
+    description: Servidor principal (Gateway) 
 paths:
-  /cursos:
-    get:
-      tags: [Cursos]
-      summary: Listar cursos
-      operationId: listarCursos
-      responses:
-        '200':
-          description: Lista de cursos
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Curso'
+  /tramites:
     post:
-      tags: [Cursos]
-      summary: Crear un curso
-      operationId: crearCurso
+      summary: Iniciar una nueva solicitud de trámite (Vecino o Agente por teléfono)
+      operationId: crearTramite
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CursoNuevo'
-            example:
-              nombre: Ingeniería de Software
-              cupo: 30
-              docente: Equipo docente
+              $ref: "#/components/schemas/CrearTramiteRequest"
       responses:
-        '201':
-          description: Curso creado
-          headers:
-            Location:
-              description: URI del curso creado
-              schema:
-                type: string
-                example: /cursos/4
+        "201":
+          description: Trámite creado exitosamente.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Curso'
-        '400':
-          $ref: '#/components/responses/Invalido'
-  /cursos/{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-          example: 1
+                $ref: "#/components/schemas/TramiteResponse"
+        "400":
+          $ref: "#/components/responses/400BadRequest"
+        "401":
+          $ref: "#/components/responses/401Unauthorized"
+        "403":
+          $ref: "#/components/responses/403Forbidden"
+        "422":
+          $ref: "#/components/responses/422UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/500InternalServerError"
+
     get:
-      tags: [Cursos]
-      summary: Obtener un curso
-      operationId: obtenerCurso
+      summary: Listar trámites (Bandeja del Agente Municipal / Historial del Vecino)
+      operationId: listarTramites
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: municipioId
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Filtrar por municipio (Regla fina ABAC para Agente)
+        - name: estado
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PENDIENTE_VALIDACION, APROBADO, RECHAZADO]
       responses:
-        '200':
-          description: El curso
+        "200":
+          description: Lista de trámites obtenida con éxito.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Curso'
-        '400':
-          $ref: '#/components/responses/Invalido'
-        '404':
-          $ref: '#/components/responses/NoEncontrado'
-    delete:
-      tags: [Cursos]
-      summary: Eliminar un curso
-      operationId: eliminarCurso
+                type: array
+                items:
+                  $ref: "#/components/schemas/TramiteResponse"
+        "401":
+          $ref: "#/components/responses/401Unauthorized"
+        "403":
+          $ref: "#/components/responses/403Forbidden"
+        "500":
+          $ref: "#/components/responses/500InternalServerError"
+
+  /tramites/{id}:
+    get:
+      summary: Consultar detalle de un trámite por ID
+      operationId: obtenerTramitePorId
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
-        '204':
-          description: Eliminado (sin cuerpo)
-        '400':
-          $ref: '#/components/responses/Invalido'
-        '404':
-          $ref: '#/components/responses/NoEncontrado'
+        "200":
+          description: Detalle del trámite.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TramiteResponse"
+        "401":
+          $ref: "#/components/responses/401Unauthorized"
+        "403":
+          $ref: "#/components/responses/403Forbidden"
+        "404":
+          $ref: "#/components/responses/404NotFound"
+        "500":
+          $ref: "#/components/responses/500InternalServerError"
+
+  /tramites/{id}/estado:
+    patch:
+      summary: Evaluar / Cambiar estado de un trámite (Solo Agente Municipal)
+      operationId: cambiarEstadoTramite
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluacionTramiteRequest"
+      responses:
+        "200":
+          description: Estado del trámite actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TramiteResponse"
+        "400":
+          $ref: "#/components/responses/400BadRequest"
+        "401":
+          $ref: "#/components/responses/401Unauthorized"
+        "403":
+          $ref: "#/components/responses/403Forbidden"
+        "404":
+          $ref: "#/components/responses/404NotFound"
+        "500":
+          $ref: "#/components/responses/500InternalServerError"
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token Bearer OIDC obtenido mediante Keycloak.
+
   schemas:
-    CursoNuevo:
+    CrearTramiteRequest:
       type: object
-      required: [nombre, cupo]
+      required:
+        - cuilJubilado
+        - municipioId
+        - tipoBeneficioId
+        - canalOrigen
       properties:
-        nombre:
+        cuilJubilado:
           type: string
-          example: Arquitectura de Software 1
-        cupo:
+          pattern: '^\d{11}$'
+          example: "20123456789"
+        municipioId:
           type: integer
-          minimum: 1
-          example: 40
-        docente:
+          example: 4
+          description: ID del municipio (1 a 12)
+        tipoBeneficioId:
           type: string
-          nullable: true
-        descripcion:
+          example: "TARIFA_SOCIAL_SUBTE"
+        canalOrigen:
           type: string
+          enum: [WEB, WHATSAPP, TELEFONICO]
+          example: "WHATSAPP"
+        datosAdicionales:
+          type: object
+          description: Campos dinámicos requeridos según las reglas del municipio.
+          additionalProperties: true
+
+    EvaluacionTramiteRequest:
+      type: object
+      required:
+        - estado
+        - observacion
+      properties:
+        estado:
+          type: string
+          enum: [APROBADO, RECHAZADO]
+          example: "APROBADO"
+        observacion:
+          type: string
+          maxLength: 500
+          example: "Cumple con los requisitos del padrón y tarifa social municipal."
+
+    TramiteResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "d3b07384-d113-424a-80c7-3b95764d2d64"
+        cuilJubilado:
+          type: string
+          example: "20123456789"
+        municipioId:
+          type: integer
+          example: 4
+        tipoBeneficioId:
+          type: string
+          example: "TARIFA_SOCIAL_SUBTE"
+        canalOrigen:
+          type: string
+          example: "WHATSAPP"
+        estado:
+          type: string
+          enum: [PENDIENTE_VALIDACION, APROBADO, RECHAZADO]
+          example: "PENDIENTE_VALIDACION"
+        verificadoEnPadron:
+          type: boolean
+          example: true
+        fechaCreacion:
+          type: string
+          format: date-time
+          example: "2026-11-03T10:15:30Z"
+        evaluacion:
+          type: object
           nullable: true
-    Curso:
-      allOf:
-        - type: object
-          required: [id, creadoEn]
           properties:
-            id:
-              type: integer
-              example: 1
-            creadoEn:
+            agenteId:
+              type: string
+              example: "agente_perez"
+            fechaEvaluacion:
               type: string
               format: date-time
-        - $ref: '#/components/schemas/CursoNuevo'
+            observacion:
+              type: string
+
+    # Esquema Estándar Problem Details (RFC 9457)
     ProblemDetails:
-      description: Formato de error estándar (RFC 9457, antes RFC 7807)
       type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
       properties:
         type:
           type: string
-          example: about:blank
+          format: uri
+          example: "https://tramites.consorcio.gob.ar/errors/invalid-request"
         title:
           type: string
-          example: Curso no encontrado
+          example: "Parámetros de solicitud inválidos"
         status:
           type: integer
-          example: 404
+          example: 400
         detail:
           type: string
-          example: No existe un curso con id 99.
+          example: "El CUIL ingresado no cumple con el formato de 11 dígitos esperados."
         instance:
           type: string
-          example: /cursos/99
+          format: uri
+          example: "/tramites"
+
   responses:
-    NoEncontrado:
-      description: El recurso no existe
+    400BadRequest:
+      description: Solicitud mal formada o falla de validación sintáctica.
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ProblemDetails'
-    Invalido:
-      description: Datos de entrada inválidos
+            $ref: "#/components/schemas/ProblemDetails"
+
+    401Unauthorized:
+      description: Credenciales de autenticación ausentes o inválidas.
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ProblemDetails'
+            $ref: "#/components/schemas/ProblemDetails"
+
+    403Forbidden:
+      description: El usuario no posee los roles/permisos necesarios para realizar la acción.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+
+    404NotFound:
+      description: El recurso solicitado no existe.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+
+    422UnprocessableEntity:
+      description: Error de regla de negocio (ej. el jubilado no figura en el padrón nacional).
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+
+    500InternalServerError:
+      description: Error interno del servidor (se responde sin filtrar información interna).
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
