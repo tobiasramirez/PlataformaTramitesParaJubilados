@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # 4. Instalación limpia solo con dependencias de producción
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # 5. Copiar el código fuente de la aplicación
 COPY . .
