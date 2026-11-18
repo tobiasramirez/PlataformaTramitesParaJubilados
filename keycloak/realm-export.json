@@ -1,0 +1,76 @@
+{
+  "realm": "consorcio-regional",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      { "name": "vecinoJubilado" },
+      { "name": "agenteMunicipal" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "portal-web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "protocolMappers": [
+        {
+          "name": "municipio-id-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "municipio_id",
+            "claim.name": "municipio_id",
+            "jsonType.label": "int",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "bot-whatsapp",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "whatsapp-secret-123",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "vecino1",
+      "enabled": true,
+      "email": "vecino1@test.gob.ar",
+      "firstName": "Carlos",
+      "lastName": "Gomez",
+      "credentials": [
+        { "type": "password", "value": "vecino123", "temporary": false }
+      ],
+      "realmRoles": ["vecinoJubilado"]
+    },
+    {
+      "username": "agente_muni4",
+      "enabled": true,
+      "email": "agente4@muni4.gob.ar",
+      "firstName": "Laura",
+      "lastName": "Perez",
+      "attributes": {
+        "municipio_id": ["4"]
+      },
+      "credentials": [
+        { "type": "password", "value": "agente123", "temporary": false }
+      ],
+      "realmRoles": ["agenteMunicipal"]
+    },
+    {
+      "username": "service-account-bot-whatsapp",
+      "enabled": true,
+      "serviceAccountClientId": "bot-whatsapp",
+      "realmRoles": ["vecinoJubilado"]
+    }
+  ]
+}
