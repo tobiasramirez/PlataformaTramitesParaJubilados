@@ -57,7 +57,7 @@ OpenAPI (Swagger UI): http://localhost:8080
 6. Usuarios de Prueba (Keycloak)
 El realm consorcio-regional (cliente portal-web) incluye usuarios preconfigurados para validar los controles de acceso RBAC y ABAC.
 User: vecino1  Password: vecino123
-User agentemuni4 Password: agente123
+User agentemuni_4 Password: agente123
 
 7. Comandos en powershell para las pruebas
 # 1. Login como vecino1
