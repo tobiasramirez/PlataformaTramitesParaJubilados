@@ -5,7 +5,7 @@ const { createRemoteJWKSet, jwtVerify } = require('jose');
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 3001;
 const CANAL_BACKEND = process.env.CANAL_BACKEND || 'TELEFONICO';
 const PADRON_MOCK_URL = process.env.PADRON_MOCK_URL || 'http://padron-mock:8081';
 const OIDC_ISSUER_URL = process.env.OIDC_ISSUER_URL || 'http://keycloak:8080/realms/consorcio-regional';
