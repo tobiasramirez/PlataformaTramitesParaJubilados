@@ -24,6 +24,7 @@ const JWKS = createRemoteJWKSet(
   new URL(`${OIDC_ISSUER_URL}/protocol/openid-connect/certs`)
 );
 
+
 // Helper: Respuestas de error estándar RFC 9457 (Problem Details)
 function sendProblem(res, status, title, detail, instance) {
   return res
@@ -76,10 +77,9 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', canal: CANAL_BACKEND });
 });
 
-// ---------------------------------------------------------------------------
-// CASO DE USO 1: Iniciar solicitud de trámite (POST /api/v1/tramites)
-// Roles: vecinoJubilado, agenteMunicipal (y cliente M2M WhatsApp)
-// ---------------------------------------------------------------------------
+const path = require('path');
+app.use('/portal', express.static(path.join(__dirname, '../public')));
+
 app.post(
   '/api/v1/tramites',
   autenticarOIDC,

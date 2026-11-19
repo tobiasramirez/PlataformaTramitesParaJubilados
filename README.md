@@ -47,6 +47,7 @@ La solución implementa una **Arquitectura Modular Orientada por Canal** despleg
    docker compose ps
 (Nota: Keycloak demora aproximadamente 25-30 segundos en inicializar e importar el realm consorcio-regional).
 5. Endpoints y Acceso
+Portal web: http://localhost/portal/index.html
 API Gateway (Punto de entrada principal): http://localhostAutenticación 
 OIDC: POST http://localhost/realms/consorcio-regional/protocol/openid-connect/tokenCanal 
 Web: http://localhost/api/v1/web/tramitesCanal 
@@ -55,6 +56,8 @@ Telefónico: http://localhost/api/v1/telefonico/tramitesDocumentación
 OpenAPI (Swagger UI): http://localhost:8080
 6. Usuarios de Prueba (Keycloak)
 El realm consorcio-regional (cliente portal-web) incluye usuarios preconfigurados para validar los controles de acceso RBAC y ABAC.
+User: vecino1  Password: vecino123
+User agentemuni4 Password: agente123
 
 7. Comandos en powershell para las pruebas
 # 1. Login como vecino1

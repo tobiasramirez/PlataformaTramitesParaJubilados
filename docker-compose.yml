@@ -46,8 +46,9 @@ services:
       - frontend-net
       - backend-net
     depends_on:
-      db:
-        condition: service_healthy
+      - db
+      - keycloak
+      - padron-mock
 
   # 2. Backend Canal WhatsApp (Webhook M2M para la API de WhatsApp)
   backend-whatsapp:
@@ -67,8 +68,9 @@ services:
       - frontend-net
       - backend-net
     depends_on:
-      db:
-        condition: service_healthy
+      - db
+      - keycloak
+      - padron-mock
 
   # 3. Backend Canal Telefónico (Panel y gestión para Agentes)
   backend-telefonico:
@@ -88,8 +90,9 @@ services:
       - frontend-net
       - backend-net
     depends_on:
-      db:
-        condition: service_healthy
+      - db
+      - keycloak
+      - padron-mock
 
   # Base de datos compartida aislada en red interna
   db:
@@ -128,10 +131,9 @@ services:
 
   # Mock Padrón Nacional
   padron-mock:
-    build:
-      context: ./mocks/padron
-      dockerfile: Dockerfile
+    build: ./padron-mock
     container_name: tramites_padron_mock
+    restart: unless-stopped
     networks:
       - backend-net
 

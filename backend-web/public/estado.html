@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal Regional de Jubilados - Estado de Trámite</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 18px; line-height: 1.5; max-width: 720px; margin: 24px auto; padding: 0 16px; background: #f4f6f9; color: #111; }
+    nav { background: #0b3c5d; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; }
+    nav a { color: #fff; font-weight: bold; margin-right: 20px; text-decoration: none; font-size: 19px; }
+    section { background: #fff; padding: 20px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 20px; }
+    h1 { font-size: 24px; color: #0b3c5d; margin-top: 0; }
+    h2 { font-size: 20px; margin-top: 0; }
+    label { display: block; font-weight: bold; margin-top: 12px; }
+    input, button { width: 100%; font-size: 18px; padding: 10px; margin-top: 6px; box-sizing: border-box; border-radius: 4px; border: 1px solid #666; }
+    button { background: #0b3c5d; color: #fff; font-weight: bold; border: none; cursor: pointer; margin-top: 14px; }
+    .btn-ok { background: #1e6f3d; }
+    .msg { margin-top: 14px; padding: 12px; border-radius: 4px; background: #eef3f7; border-left: 5px solid #0b3c5d; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Navegación principal">
+    <a href="/portal/index.html">1. Iniciar Trámite</a>
+    <a href="/portal/estado.html">2. Consultar / Gestionar Estado</a>
+  </nav>
+
+  <h1>Seguimiento y Evaluación de Trámite</h1>
+
+  <section>
+    <h2>Consultar Trámite por ID</h2>
+    <label for="tramiteId">ID del Trámite (UUID)</label>
+    <input id="tramiteId" placeholder="Pegue el UUID del trámite" />
+    <button type="button" onclick="consultar()">Consultar Estado</button>
+    <div id="detalle" class="msg" role="status">Ingrese un ID para consultar.</div>
+  </section>
+
+  <section>
+    <h2>Panel Agente Municipal (RBAC / ABAC)</h2>
+    <p>Solo usuarios con rol <code>agenteMunicipal</code> y <code>municipio_id</code> coincidente pueden aprobar.</p>
+    <button type="button" class="btn-ok" onclick="aprobar()">Aprobar Trámite</button>
+    <div id="evalMsg" class="msg" role="status">Esperando acción...</div>
+  </section>
+
+  <script>
+    const guardado = localStorage.getItem('ultimo_tramite_id');
+    if (guardado) document.getElementById('tramiteId').value = guardado;
+
+    async function consultar() {
+      const id = document.getElementById('tramiteId').value.trim();
+      const token = localStorage.getItem('jwt_token');
+      const res = await fetch(`/api/v1/web/tramites/${id}`, {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const data = await res.json();
+      document.getElementById('detalle').textContent = res.ok
+        ? `Estado actual: ${data.estado} | CUIL: ${data.cuil_jubilado || data.cuilJubilado} | Municipio: ${data.municipio_id || data.municipioId}`
+        : `Error (${res.status}): ${data.detail || JSON.stringify(data)}`;
+    }
+
+    async function aprobar() {
+      const id = document.getElementById('tramiteId').value.trim();
+      const token = localStorage.getItem('jwt_token');
+      const res = await fetch(`/api/v1/web/tramites/${id}/estado`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ estado: 'APROBADO', observacion: 'Aprobado desde Portal Web MPA' })
+      });
+      const data = await res.json();
+      document.getElementById('evalMsg').textContent = res.ok
+        ? `Trámite APROBADO exitosamente (Estado: ${data.estado})`
+        : `Acceso denegado / Error (${res.status}): ${data.detail || JSON.stringify(data)}`;
+    }
+  </script>
+</body>
+</html>

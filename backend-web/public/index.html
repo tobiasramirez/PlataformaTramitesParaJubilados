@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal Regional de Jubilados - Iniciar Trámite</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 18px; line-height: 1.5; max-width: 720px; margin: 24px auto; padding: 0 16px; background: #f4f6f9; color: #111; }
+    nav { background: #0b3c5d; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; }
+    nav a { color: #fff; font-weight: bold; margin-right: 20px; text-decoration: none; font-size: 19px; }
+    nav a:hover { text-decoration: underline; }
+    section { background: #fff; padding: 20px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 20px; }
+    h1 { font-size: 24px; color: #0b3c5d; margin-top: 0; }
+    h2 { font-size: 20px; margin-top: 0; }
+    label { display: block; font-weight: bold; margin-top: 12px; }
+    input, select, button { width: 100%; font-size: 18px; padding: 10px; margin-top: 6px; box-sizing: border-box; border-radius: 4px; border: 1px solid #666; }
+    button { background: #0b3c5d; color: #fff; font-weight: bold; border: none; cursor: pointer; margin-top: 16px; }
+    button:hover { background: #082a42; }
+    .msg { margin-top: 14px; padding: 12px; border-radius: 4px; background: #eef3f7; border-left: 5px solid #0b3c5d; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Navegación principal">
+    <a href="/portal/index.html">1. Iniciar Trámite</a>
+    <a href="/portal/estado.html">2. Consultar / Gestionar Estado</a>
+  </nav>
+
+  <h1>Portal Regional de Trámites para Jubilados</h1>
+
+  <section>
+    <h2>Paso 1: Identificación (OIDC Keycloak)</h2>
+    <label for="user">Usuario</label>
+    <input id="user" value="vecino1" />
+    <label for="pass">Contraseña</label>
+    <input id="pass" type="password" value="vecino123" />
+    <button type="button" onclick="login()">Ingresar</button>
+    <div id="authStatus" class="msg">Estado: Sin autenticar</div>
+  </section>
+
+  <section>
+    <h2>Paso 2: Solicitar Beneficio</h2>
+    <label for="cuil">CUIL del Jubilado</label>
+    <input id="cuil" value="20123456788" />
+
+    <label for="muni">Municipio</label>
+    <select id="muni">
+      <option value="4" selected>Municipio 4</option>
+      <option value="1">Municipio 1</option>
+      <option value="2">Municipio 2</option>
+    </select>
+
+    <label for="beneficio">Tipo de Beneficio</label>
+    <select id="beneficio">
+      <option value="TARIFA_SOCIAL_TRANSPORTE">Tarifa Social Transporte</option>
+      <option value="EXENCION_ABL">Exención Tasa Municipal (ABL)</option>
+    </select>
+
+    <label for="domicilio">Domicilio</label>
+    <input id="domicilio" value="Av. Roca 123" />
+
+    <button type="button" onclick="crearTramite()">Enviar Solicitud</button>
+    <div id="resultado" class="msg" role="status">Complete los datos para iniciar su trámite.</div>
+  </section>
+
+  <script>
+    if (localStorage.getItem('jwt_token')) {
+      document.getElementById('authStatus').textContent = 'Sesión activa como: ' + localStorage.getItem('jwt_user');
+    }
+
+    async function login() {
+      const username = document.getElementById('user').value;
+      const password = document.getElementById('pass').value;
+      const body = new URLSearchParams({ client_id: 'portal-web', username, password, grant_type: 'password' });
+
+      const res = await fetch('/realms/consorcio-regional/protocol/openid-connect/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('jwt_token', data.access_token);
+        localStorage.setItem('jwt_user', username);
+        document.getElementById('authStatus').textContent = 'Autenticado correctamente como: ' + username;
+      } else {
+        document.getElementById('authStatus').textContent = 'Error de login: ' + JSON.stringify(data);
+      }
+    }
+
+    async function crearTramite() {
+      const token = localStorage.getItem('jwt_token');
+      const res = await fetch('/api/v1/web/tramites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({
+          cuilJubilado: document.getElementById('cuil').value,
+          municipioId: Number(document.getElementById('muni').value),
+          tipoBeneficioId: document.getElementById('beneficio').value,
+          datosAdicionales: { domicilio: document.getElementById('domicilio').value }
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('ultimo_tramite_id', data.id);
+        document.getElementById('resultado').innerHTML =
+          `<strong>Trámite creado con éxito.</strong><br>ID: <code>${data.id}</code><br>Estado: <strong>${data.estado}</strong>`;
+      } else {
+        document.getElementById('resultado').textContent = `Error (${res.status}): ${data.detail || JSON.stringify(data)}`;
+      }
+    }
+  </script>
+</body>
+</html>
