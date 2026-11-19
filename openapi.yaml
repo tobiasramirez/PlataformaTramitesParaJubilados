@@ -6,8 +6,12 @@ info:
     API REST para la gestión multicanal e intermunicipal de solicitudes de beneficios
     para jubilados (Dominio 7B). Implementa respuestas de error según RFC 9457 (Problem Details).
 servers:
-  - url: http://localhost:3001
-    description: Servidor principal (Gateway) 
+  - url: http://localhost/api/v1/web
+    description: API Gateway - Canal Web
+  - url: http://localhost/api/v1/whatsapp
+    description: API Gateway - Canal WhatsApp
+  - url: http://localhost/api/v1/telefonico
+    description: API Gateway - Canal Telefónico
 paths:
   /tramites:
     post:
